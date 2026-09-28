@@ -4,7 +4,7 @@ import api from '../api/axios'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js' 
 
-const email = ref('')
+const username = ref('')
 const password = ref('')
 const errorMessage = ref('')
 
@@ -14,7 +14,7 @@ const authStore = useAuthStore()
 const login = async () => {
   try {
     const response = await api.post('/auth/login', {
-      email: email.value,
+      username: username.value,
       password: password.value,
     })
     authStore.login(response.data.token, response.data.user)
@@ -54,22 +54,14 @@ const login = async () => {
           <h2>Welcome Back!</h2>
           <p class="subtitle">Sign in to access your dashboard</p>
           <div class="form"> 
-            <label for="fullname"> Email </label>
-            <input type="email" id="email" placeholder="Enter email" v-model="email">
+            <label for="fullname"> Username </label>
+            <input type="text"  placeholder="Username" v-model="username">
           </div>
           <div class="form"> 
             <label for="password"> Password </label>
-            <input type="password" id="password" placeholder="Enter password" v-model="password">
+            <input type="password" id="password" placeholder=" password" v-model="password">
           </div>
-          <div class="form">
-            <label for="role">Role</label>
-           <select v-model="role">
-            <option value="">Admin</option>
-            <option value="">Teacher</option>
-            <option value="">Student</option>
-            <option value="">Parent</option>
-           </select>
-          </div>
+          
           <button type="submit">Login</button>
           <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
         </form> 

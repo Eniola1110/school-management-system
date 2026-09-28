@@ -1,19 +1,22 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import api from '@/api/axios'
+import Pagination from '@/components/Pagination.vue'
 
 const teachers = ref([])
 const loading = ref(true)
 const errorMessage = ref('')
+const currentPage = ref(1)
+const itemsPerPage = 10
 
 const showForm = ref(false)
 const isEditing = ref(false)
 const editingId = ref(null)
 
+const createdUsername = ref('')
+const createdPassword = ref('')
+
 const form = ref({
-  email: '',
-  password: '',
-  staff_id: '',
   full_name: '',
   gender: '',
   phone: '',
@@ -41,9 +44,6 @@ const openCreateForm = () => {
   isEditing.value = false
   editingId.value = null
   form.value = {
-    email: '',
-    password: '',
-    staff_id: '',
     full_name: '',
     gender: '',
     phone: '',
@@ -56,9 +56,6 @@ const openEditForm = (teacher) => {
   isEditing.value = true
   editingId.value = teacher.id
   form.value = {
-    email: '',
-    password: '',
-    staff_id: teacher.staff_id,
     full_name: teacher.full_name,
     gender: teacher.gender,
     phone: teacher.phone,
@@ -78,17 +75,23 @@ const submitForm = async () => {
 
     if (isEditing.value) {
       await api.put(`/teachers/${editingId.value}`, {
-        staff_id: form.value.staff_id,
         full_name: form.value.full_name,
         gender: form.value.gender,
         phone: form.value.phone,
         specialization: form.value.specialization
       })
     } else {
+      const cleanName = form.value.full_name.toLowerCase().replace(/\s+/g, '')
+      const randomNum = Math.floor(Math.random() * 1000)
+      const username = cleanName + randomNum
+      const generatedPassword = 'Edu@' + Math.random().toString(36).slice(2, 8).toUpperCase()
+
+      console.log('Generated password:', generatedPassword)
+
       const registerRes = await api.post('/auth/register', {
         full_name: form.value.full_name,
-        email: form.value.email,
-        password: form.value.password,
+        username,
+        password: generatedPassword,
         role: 'teacher'
       })
 
@@ -96,19 +99,27 @@ const submitForm = async () => {
 
       await api.post('/teachers', {
         user_id: newUserId,
-        staff_id: form.value.staff_id,
         full_name: form.value.full_name,
         gender: form.value.gender,
         phone: form.value.phone,
         specialization: form.value.specialization
       })
+      createdUsername.value = username
+      createdPassword.value = generatedPassword
     }
 
-    closeForm()
     fetchTeachers()
+    setTimeout(() => {
+  closeForm()
+  createdUsername.value = ''
+  createdPassword.value = ''
+}, 5000)
   } catch (err) {
-    errorMessage.value = err.response?.data?.message || 'Something went wrong'
-    console.error(err)
+   console.log(err)
+  console.log(err.response)
+  console.log(err.response?.data)
+
+  errorMessage.value = err.response?.data?.message || 'Something went wrong'
   }
 }
 
@@ -122,6 +133,16 @@ const deleteTeacher = async (id) => {
     console.error(err)
   }
 }
+
+const totalPages = computed(() => {
+  return Math.ceil(teachers.value.length / itemsPerPage)
+})
+
+const paginatedTeachers = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  const end = start + itemsPerPage
+  return teachers.value.slice(start, end)
+})
 </script>
 
 <template>
@@ -138,7 +159,7 @@ const deleteTeacher = async (id) => {
       <table v-if="teachers.length > 0">
         <thead>
           <tr>
-            <th>Staff ID</th>
+            <th>ID</th>
             <th>Full Name</th>
             <th>Gender</th>
             <th>Phone</th>
@@ -147,8 +168,8 @@ const deleteTeacher = async (id) => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="teacher in teachers" :key="teacher.id">
-            <td>{{ teacher.staff_id }}</td>
+          <tr v-for="(teacher, index) in paginatedTeachers" :key="teacher.id">
+            <td>{{ (currentPage - 1) * itemsPerPage + index + 1 }}</td>
             <td>{{ teacher.full_name }}</td>
             <td class="capitalize">{{ teacher.gender }}</td>
             <td>{{ teacher.phone }}</td>
@@ -160,30 +181,28 @@ const deleteTeacher = async (id) => {
           </tr>
         </tbody>
       </table>
-      <p v-else class="empty-state">No teachers found. Click "Add Teacher" to create one.</p>
+      <Pagination
+      :currentPage="currentPage"
+      :totalPages="totalPages"
+      @change-page="currentPage = $event"
+      />
     </div>
 
     <div v-if="showForm" class="modal-overlay" @click.self="closeForm">
       <div class="modal">
         <h2>{{ isEditing ? 'Edit Teacher' : 'Add New Teacher' }}</h2>
 
+        <div v-if="createdUsername && !isEditing" class="credential">
+          <h3>Teacher Login Credentials</h3>
+          <p><strong>Username:</strong>
+          {{ createdUsername }}</p>
+          <p><strong>Password:</strong>
+          {{ createdPassword }}</p>
+        </div>
         <form @submit.prevent="submitForm">
-          <div class="form-row" v-if="!isEditing">
-            <div class="form-group">
-              <label>Email (for login)</label>
-              <input v-model="form.email" type="email" required />
-            </div>
-            <div class="form-group">
-              <label>Password</label>
-              <input v-model="form.password" type="password" required />
-            </div>
-          </div>
 
           <div class="form-row">
-            <div class="form-group">
-              <label>Staff ID</label>
-              <input v-model="form.staff_id" type="text" required />
-            </div>
+           
             <div class="form-group">
               <label>Full Name</label>
               <input v-model="form.full_name" type="text" required />

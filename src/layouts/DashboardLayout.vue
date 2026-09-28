@@ -34,6 +34,7 @@ const toggleSidebar = () => {
         <RouterLink to="/dashboard/attendance" class="nav-link"><i class="fa-solid fa-clipboard-check"></i>Attendance</RouterLink>
         <RouterLink to="/dashboard/results" class="nav-link"><i class="fa-solid fa-chart-line"></i>Results</RouterLink>
         <RouterLink to="/dashboard/fees" class="nav-link"><i class="fa-solid fa-money-bill-wave"></i>Fees</RouterLink>
+        <RouterLink to="/dashboard/payments" class="nav-link"><i class="fa-solid fa-credit-card"></i>Payment</RouterLink>
          <RouterLink to="/dashboard/announcements" class="nav-link"><i class="fa-solid fa-bullhorn"></i>Announcements</RouterLink>
       </nav>
       <button class="logout-btn" @click="logout"><i class="fa-solid fa-right-from-bracket"></i>Logout</button>
@@ -61,14 +62,14 @@ const toggleSidebar = () => {
   display: flex;
   min-height: 100vh;
 }
-
+ 
 .sidebar {
-  width: 200px;
+  width: 180px;
   background-color: var(--color-sidebar);
   color: white;
   display: flex;
   flex-direction: column;
-  padding: 1.5rem 0.5rem;
+  padding: 1.0rem 0.5rem;
 }
 
 .sidebar-header h2 {
@@ -86,9 +87,10 @@ const toggleSidebar = () => {
 .nav-link {
   color: #CBD5E1;
   text-decoration: none;
-  padding: 0.7rem 1rem;
+  padding: 0.5rem 1rem;
   border-radius: var(--radius-sm);
   transition: background-color 0.2s;
+  font-size: 0.8rem;
 }
 
 .nav-link:hover {
@@ -112,8 +114,8 @@ const toggleSidebar = () => {
 
 .nav-link i,
 .logout-btn i {
-  width: 20px;
-  margin-right: 0.6rem;
+  width: 18px;
+  margin-right: 0.5rem;
   text-align: center;
 }
 .topbar {
@@ -144,7 +146,7 @@ const toggleSidebar = () => {
   font-weight: bold;
 }
 .page-content {
-  padding: 2rem;
+  padding: 1rem;
   flex: 1;
   background-color: var(--color-background);
 }

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import api from '@/api/axios'
+import router from '@/router'
 
 const classes = ref([])
 const loading = ref(true)
@@ -113,6 +114,15 @@ const deleteClass = async (id) => {
     console.error(err)
   }
 }
+
+const viewTimetable = (classId) => {
+  router.push({
+    name: 'ClassTimetable',
+    params: {
+      classId
+    }
+  })
+}
 </script>
 
 <template>
@@ -143,6 +153,7 @@ const deleteClass = async (id) => {
             <td class="capitalize">{{ cls.level }}</td>
             <td>{{ getTeacherName(cls.class_teacher_id) }}</td>
             <td class="actions">
+              <button class="btn-timetable" @click="viewTimetable(cls.id)">View Timetable</button>
               <button class="btn-edit" @click="openEditForm(cls)">Edit</button>
               <button class="btn-delete" @click="deleteClass(cls.id)">Delete</button>
             </td>
@@ -325,5 +336,19 @@ td {
   padding: 0.6rem 1.2rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
+}
+
+.btn-timetable {
+  background-color: #10b981;
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.btn-timetable:hover {
+  opacity: 0.9;
 }
 </style>

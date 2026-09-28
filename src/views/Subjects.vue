@@ -1,9 +1,10 @@
+```vue
 <script setup>
 import { ref, onMounted } from 'vue'
 import api from '@/api/axios'
 
+// ==================== STATE ====================
 const subjects = ref([])
-const classesList = ref([])
 const loading = ref(true)
 const errorMessage = ref('')
 
@@ -12,205 +13,255 @@ const isEditing = ref(false)
 const editingId = ref(null)
 
 const form = ref({
-  subject_name: '',
-  class_ids: [],
-  class_id: ''
+  subject_name: ''
 })
 
+// ==================== FETCH SUBJECTS ====================
 const fetchSubjects = async () => {
   try {
     loading.value = true
+    errorMessage.value = ''
+
     const res = await api.get('/subjects')
     subjects.value = res.data.subjects
   } catch (err) {
-    errorMessage.value = 'Failed to load subjects'
     console.error(err)
+    errorMessage.value = 'Failed to load subjects'
   } finally {
     loading.value = false
   }
 }
 
-const fetchClassesList = async () => {
-  try {
-    const res = await api.get('/classes')
-    classesList.value = res.data.classes
-  } catch (err) {
-    console.error(err)
-  }
-}
-
-onMounted(() => {
-  fetchSubjects()
-  fetchClassesList()
-})
-
-const getClassName = (classId) => {
-  const cls = classesList.value.find(c => c.id === classId)
-  return cls ? `${cls.class_name} ${cls.arm}` : classId
-}
-
+// ==================== OPEN CREATE FORM ====================
 const openCreateForm = () => {
   isEditing.value = false
   editingId.value = null
-  form.value = { subject_name: '', class_ids: [], class_id: '' }
+
+  form.value = {
+    subject_name: ''
+  }
+
+  errorMessage.value = ''
   showForm.value = true
 }
 
+// ==================== OPEN EDIT FORM ====================
 const openEditForm = (subject) => {
   isEditing.value = true
   editingId.value = subject.id
+
   form.value = {
-    subject_name: subject.subject_name,
-    class_ids: [],
-    class_id: subject.class_id
+    subject_name: subject.subject_name
   }
+
+  errorMessage.value = ''
   showForm.value = true
 }
 
+// ==================== CLOSE FORM ====================
 const closeForm = () => {
   showForm.value = false
   errorMessage.value = ''
 }
 
+// ==================== SUBMIT FORM ====================
 const submitForm = async () => {
   try {
     errorMessage.value = ''
 
+    if (!form.value.subject_name.trim()) {
+      errorMessage.value = 'Subject name is required.'
+      return
+    }
+
     if (isEditing.value) {
-      // editing: just update the one subject record
       await api.put(`/subjects/${editingId.value}`, {
-        subject_name: form.value.subject_name,
-        class_id: form.value.class_id
+        subject_name: form.value.subject_name.trim()
       })
     } else {
-      // creating: validate at least one class is selected
-      if (form.value.class_ids.length === 0) {
-        errorMessage.value = 'Please select at least one class'
-        return
-      }
-
-      // create one subject row per selected class simultaneously
-      await Promise.all(
-        form.value.class_ids.map(class_id =>
-          api.post('/subjects', {
-            subject_name: form.value.subject_name,
-            class_id
-          })
-        )
-      )
+      await api.post('/subjects', {
+        subject_name: form.value.subject_name.trim()
+      })
     }
 
     closeForm()
-    fetchSubjects()
+    await fetchSubjects()
+
   } catch (err) {
-    errorMessage.value = err.response?.data?.message || 'Something went wrong'
     console.error(err)
+
+    errorMessage.value =
+      err.response?.data?.message || 'Something went wrong.'
   }
 }
 
+// ==================== DELETE SUBJECT ====================
 const deleteSubject = async (id) => {
-  if (!confirm('Are you sure you want to delete this subject?')) return
+  if (!confirm('Are you sure you want to delete this subject?')) {
+    return
+  }
+
   try {
+    errorMessage.value = ''
+
     await api.delete(`/subjects/${id}`)
-    fetchSubjects()
+
+    await fetchSubjects()
+
   } catch (err) {
-    errorMessage.value = 'Failed to delete subject'
     console.error(err)
+
+    errorMessage.value =
+      err.response?.data?.message || 'Failed to delete subject.'
   }
 }
+
+// ==================== PAGE LOAD ====================
+onMounted(() => {
+  fetchSubjects()
+})
 </script>
 
 <template>
   <div class="page">
+
+    <!-- PAGE HEADER -->
     <div class="page-header">
       <h1>Subjects</h1>
-      <button class="btn-primary" @click="openCreateForm">+ Add Subject</button>
+
+      <button
+        class="btn-primary"
+        @click="openCreateForm"
+      >
+        Add Subject
+      </button>
     </div>
 
-    <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
-    <p v-if="loading">Loading subjects...</p>
+    <!-- ERROR -->
+    <p
+      v-if="errorMessage"
+      class="error"
+    >
+      {{ errorMessage }}
+    </p>
 
-    <div v-else class="table-card">
+    <!-- LOADING -->
+    <p v-if="loading">
+      Loading subjects...
+    </p>
+
+    <!-- SUBJECT TABLE -->
+    <div
+      v-else
+      class="table-card"
+    >
+
       <table v-if="subjects.length > 0">
+
         <thead>
           <tr>
             <th>Subject Name</th>
-            <th>Class</th>
             <th>Actions</th>
           </tr>
         </thead>
+
         <tbody>
-          <tr v-for="subject in subjects" :key="subject.id">
-            <td>{{ subject.subject_name }}</td>
-            <td>{{ getClassName(subject.class_id) }}</td>
+
+          <tr
+            v-for="subject in subjects"
+            :key="subject.id"
+          >
+            <td>
+              {{ subject.subject_name }}
+            </td>
+
             <td class="actions">
-              <button class="btn-edit" @click="openEditForm(subject)">Edit</button>
-              <button class="btn-delete" @click="deleteSubject(subject.id)">Delete</button>
+
+              <button
+                class="btn-edit"
+                @click="openEditForm(subject)"
+              >
+                Edit
+              </button>
+
+              <button
+                class="btn-delete"
+                @click="deleteSubject(subject.id)"
+              >
+                Delete
+              </button>
+
             </td>
           </tr>
+
         </tbody>
+
       </table>
-      <p v-else class="empty-state">No subjects found. Click "Add Subject" to create one.</p>
+
+      <p
+        v-else
+        class="empty-state"
+      >
+        No subjects found. Click "Add Subject" to create one.
+      </p>
+
     </div>
 
-    <div v-if="showForm" class="modal-overlay" @click.self="closeForm">
+    <!-- MODAL -->
+    <div
+      v-if="showForm"
+      class="modal-overlay"
+      @click.self="closeForm"
+    >
+
       <div class="modal">
-        <h2>{{ isEditing ? 'Edit Subject' : 'Add New Subject' }}</h2>
+
+        <h2>
+          {{ isEditing ? 'Edit Subject' : 'Add New Subject' }}
+        </h2>
+
         <form @submit.prevent="submitForm">
 
           <div class="form-group">
-            <label>Subject Name</label>
+
+            <label>
+              Subject Name
+            </label>
+
             <input
               v-model="form.subject_name"
               type="text"
               placeholder="e.g. Mathematics"
               required
             />
-          </div>
 
-          <!-- CREATE MODE: checkbox list for multiple classes -->
-          <div v-if="!isEditing" class="form-group">
-            <label>Assign to Classes <span class="label-hint">(select one or more)</span></label>
-            <div class="checkbox-list">
-              <label
-                v-for="cls in classesList"
-                :key="cls.id"
-                class="checkbox-item"
-              >
-                <input
-                  type="checkbox"
-                  :value="cls.id"
-                  v-model="form.class_ids"
-                />
-                {{ cls.class_name }} {{ cls.arm }}
-                <span class="level-badge capitalize">{{ cls.level }}</span>
-              </label>
-            </div>
-            <p v-if="form.class_ids.length > 0" class="selection-count">
-              {{ form.class_ids.length }} class{{ form.class_ids.length > 1 ? 'es' : '' }} selected
-            </p>
-          </div>
-
-          <!-- EDIT MODE: single class dropdown -->
-          <div v-else class="form-group">
-            <label>Class</label>
-            <select v-model="form.class_id" required>
-              <option value="">Select Class</option>
-              <option v-for="cls in classesList" :key="cls.id" :value="cls.id">
-                {{ cls.class_name }} {{ cls.arm }}
-              </option>
-            </select>
           </div>
 
           <div class="modal-actions">
-            <button type="button" class="btn-secondary" @click="closeForm">Cancel</button>
-            <button type="submit" class="btn-primary">
-              {{ isEditing ? 'Update' : `Create for ${form.class_ids.length || 0} class${form.class_ids.length !== 1 ? 'es' : ''}` }}
+
+            <button
+              type="button"
+              class="btn-secondary"
+              @click="closeForm"
+            >
+              Cancel
             </button>
+
+            <button
+              type="submit"
+              class="btn-primary"
+            >
+              {{ isEditing ? 'Update' : 'Save' }}
+            </button>
+
           </div>
+
         </form>
+
       </div>
+
     </div>
+
   </div>
 </template>
 
@@ -256,14 +307,14 @@ const deleteSubject = async (id) => {
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 600;
-  transition: background-color 0.2s ease;
 }
 
 .btn-secondary:hover {
   background-color: var(--color-background);
 }
 
-.btn-edit, .btn-delete {
+.btn-edit,
+.btn-delete {
   border: none;
   padding: 0.45rem 0.9rem;
   border-radius: var(--radius-sm);
@@ -274,14 +325,17 @@ const deleteSubject = async (id) => {
   transition: opacity 0.2s ease;
 }
 
-.btn-edit { 
-  background-color: var(--color-primary); 
+.btn-edit {
+  background-color: var(--color-primary);
 }
-.btn-delete { 
-  background-color: var(--color-danger); 
+
+.btn-delete {
+  background-color: var(--color-danger);
 }
-.btn-edit:hover, .btn-delete:hover { 
-  opacity: 0.85; 
+
+.btn-edit:hover,
+.btn-delete:hover {
+  opacity: 0.85;
 }
 
 .error {
@@ -374,8 +428,15 @@ tbody tr:hover {
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .modal h2 {
@@ -406,15 +467,7 @@ tbody tr:hover {
   font-weight: 600;
 }
 
-.label-hint {
-  font-weight: 400;
-  color: var(--color-text-muted);
-  font-size: 0.8rem;
-  margin-left: 0.3rem;
-}
-
-.form-group input[type="text"],
-.form-group select {
+.form-group input {
   padding: 0.7rem 0.9rem;
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -423,67 +476,20 @@ tbody tr:hover {
   transition: border-color 0.2s ease;
 }
 
-.form-group input:focus,
-.form-group select:focus {
+.form-group input:focus {
   outline: none;
   border-color: var(--color-primary);
 }
 
-/* ---------- Checkbox List ---------- */
-.checkbox-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  max-height: 200px;
-  overflow-y: auto;
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 0.8rem;
-  background-color: var(--color-background);
-}
+@media (max-width: 600px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
 
-.checkbox-item {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  font-size: 0.9rem;
-  color: var(--color-text);
-  cursor: pointer;
-  padding: 0.3rem 0.4rem;
-  border-radius: var(--radius-sm);
-  transition: background-color 0.15s ease;
-}
-
-.checkbox-item:hover {
-  background-color: white;
-}
-
-.checkbox-item input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  accent-color: var(--color-primary);
-  flex-shrink: 0;
-}
-
-.level-badge {
-  margin-left: auto;
-  font-size: 0.72rem;
-  color: var(--color-text-muted);
-  background: white;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-  border: 1px solid var(--color-border);
-}
-
-.capitalize {
-  text-transform: capitalize;
-}
-
-.selection-count {
-  margin-top: 0.5rem;
-  font-size: 0.82rem;
-  color: var(--color-primary);
-  font-weight: 600;
+  .actions {
+    flex-wrap: wrap;
+  }
 }
 </style>

@@ -1,19 +1,23 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import api from '@/api/axios'
+import Pagination from '@/components/Pagination.vue'
 
 const parents = ref([])
 const studentsList = ref([])
 const loading = ref(true)
 const errorMessage = ref('')
+const currentPage = ref(1)
+const itemsPerPage = 10
 
 const showForm = ref(false)
 const isEditing = ref(false)
 const editingId = ref(null)
 
+const createdUsername = ref('')
+const createdPassword = ref('')
+
 const form = ref({
-  email: '',
-  password: '',
   full_name: '',
   phone: '',
   gender: '',
@@ -56,8 +60,6 @@ const openCreateForm = () => {
   isEditing.value = false
   editingId.value = null
   form.value = {
-    email: '',
-    password: '',
     full_name: '',
     phone: '',
     gender: '',
@@ -70,8 +72,6 @@ const openEditForm = (parent) => {
   isEditing.value = true
   editingId.value = parent.id
   form.value = {
-    email: '',
-    password: '',
     full_name: parent.full_name,
     phone: parent.phone,
     gender: parent.gender,
@@ -97,10 +97,15 @@ const submitForm = async () => {
         student_id: form.value.student_id
       })
     } else {
+      const cleanName = form.value.full_name.toLowerCase().replace(/\s+/g, '')
+      const randomNum = Math.floor(Math.random() * 1000)
+      const username = cleanName + randomNum
+      const generatedPassword = 'Edu@' + Math.random().toString(36).slice(2, 8).toUpperCase()
+
       const registerRes = await api.post('/auth/register', {
         full_name: form.value.full_name,
-        email: form.value.email,
-        password: form.value.password,
+        username,
+        password: generatedPassword,
         role: 'parent'
       })
 
@@ -113,10 +118,17 @@ const submitForm = async () => {
         gender: form.value.gender,
         student_id: form.value.student_id
       })
+    createdUsername.value = username
+      createdPassword.value = generatedPassword
     }
 
-    closeForm()
+    // closeForm()
     fetchParents()
+    setTimeout(() => {
+  closeForm()
+  createdUsername.value = ''
+  createdPassword.value = ''
+}, 5000)
   } catch (err) {
     errorMessage.value = err.response?.data?.message || 'Something went wrong'
     console.error(err)
@@ -133,6 +145,16 @@ const deleteParent = async (id) => {
     console.error(err)
   }
 }
+
+const totalPages = computed(() => {
+  return Math.ceil(parents.value.length / itemsPerPage)
+})
+
+const paginatedParents = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  const end = start + itemsPerPage
+  return parents.value.slice(start, end)
+})
 </script>
 
 <template>
@@ -157,7 +179,7 @@ const deleteParent = async (id) => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="parent in parents" :key="parent.id">
+          <tr v-for="parent in paginatedParents" :key="parent.id">
             <td>{{ parent.full_name }}</td>
             <td>{{ parent.phone }}</td>
             <td class="capitalize">{{ parent.gender }}</td>
@@ -169,24 +191,26 @@ const deleteParent = async (id) => {
           </tr>
         </tbody>
       </table>
-      <p v-else class="empty-state">No parents found. Click "Add Parent" to create one.</p>
+      <Pagination
+     :currentPage="currentPage"
+     :totalPages="totalPages"
+     @change-page="currentPage = $event"
+     />
     </div>
 
     <div v-if="showForm" class="modal-overlay" @click.self="closeForm">
       <div class="modal">
         <h2>{{ isEditing ? 'Edit Parent' : 'Add New Parent' }}</h2>
 
+         <div v-if="createdUsername && !isEditing" class="credential">
+          <h3>Teacher Login Credentials</h3>
+          <p><strong>Username:</strong>
+          {{ createdUsername }}</p>
+          <p><strong>Password:</strong>
+          {{ createdPassword }}</p>
+        </div>
+
         <form @submit.prevent="submitForm">
-          <div class="form-row" v-if="!isEditing">
-            <div class="form-group">
-              <label>Email (for login)</label>
-              <input v-model="form.email" type="email" required />
-            </div>
-            <div class="form-group">
-              <label>Password</label>
-              <input v-model="form.password" type="password" required />
-            </div>
-          </div>
 
           <div class="form-row">
             <div class="form-group">

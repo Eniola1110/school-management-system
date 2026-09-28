@@ -1,19 +1,24 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import api from '@/api/axios'
+import socket from '@/socket'
+import Pagination from '@/components/Pagination.vue'
+
+const router = useRouter()
 
 const students = ref([])
+const notification = ref('')
 const loading = ref(true)
 const errorMessage = ref('')
+const currentPage = ref(1)
+const itemsPerPage = 10
 
 const showForm = ref(false)
 const isEditing = ref(false)
 const editingId = ref(null)
 
 const form = ref({
-  email: '',
-  password: '',
-  student_id: '',
   class_id: '',
   full_name: '',
   date_of_birth: '',
@@ -35,30 +40,40 @@ const fetchStudents = async () => {
   }
 }
 
+const handleStudentAdded = (newStudent) => {
+  students.value.push(newStudent)
+  notification.value = `New application received: ${newStudent.full_name}`
+
+  setTimeout(() => {
+    notification.value = ''
+  }, 5000)
+}
+
 const classesList = ref([])
 
 const fetchClassesList = async () => {
   try {
     const res = await api.get('/classes')
     classesList.value = res.data.classes
-  }
-  catch (err) {
+  } catch (err) {
     console.error(err)
   }
 }
 
 onMounted(() => {
   fetchStudents()
+  socket.on('student:added', handleStudentAdded)
   fetchClassesList()
+})
+
+onUnmounted(() => {
+  socket.off('student:added', handleStudentAdded)
 })
 
 const openCreateForm = () => {
   isEditing.value = false
   editingId.value = null
   form.value = {
-    email: '',
-    password: '',
-    student_id: '',
     class_id: '',
     full_name: '',
     date_of_birth: '',
@@ -73,9 +88,6 @@ const openEditForm = (student) => {
   isEditing.value = true
   editingId.value = student.id
   form.value = {
-    email: '',
-    password: '',
-    student_id: student.student_id,
     class_id: student.class_id,
     full_name: student.full_name,
     date_of_birth: student.date_of_birth?.split('T')[0],
@@ -102,7 +114,6 @@ const submitForm = async () => {
 
     if (isEditing.value) {
       await api.put(`/students/${editingId.value}`, {
-        student_id: form.value.student_id,
         class_id: form.value.class_id,
         full_name: form.value.full_name,
         date_of_birth: form.value.date_of_birth,
@@ -111,18 +122,7 @@ const submitForm = async () => {
         guardian_phone: form.value.guardian_phone
       })
     } else {
-      const registerRes = await api.post('/auth/register', {
-        full_name: form.value.full_name,
-        email: form.value.email,
-        password: form.value.password,
-        role: 'student'
-      })
-
-      const newUserId = registerRes.data.user_id
-
       await api.post('/students', {
-        student_id: form.value.student_id,
-        user_id: newUserId,
         class_id: form.value.class_id,
         full_name: form.value.full_name,
         date_of_birth: form.value.date_of_birth,
@@ -132,8 +132,8 @@ const submitForm = async () => {
       })
     }
 
-    closeForm()
     fetchStudents()
+    closeForm()
   } catch (err) {
     errorMessage.value = err.response?.data?.message || 'Something went wrong'
     console.error(err)
@@ -150,10 +150,51 @@ const deleteStudent = async (id) => {
     console.error(err)
   }
 }
+
+const approveStudent = async (id) => {
+  try {
+    await api.put(`/students/${id}/approve`)
+    fetchStudents()
+  } catch (err) {
+    errorMessage.value = 'Failed to approve student'
+    console.error(err)
+  }
+}
+
+const viewResults = (studentId) => {
+  router.push({
+    name: 'StudentResults',
+    params: {
+      studentId
+    }
+  })
+}
+
+const viewAttendance = (studentId) => {
+  router.push({
+    name: 'StudentAttendance',
+    params: {
+      studentId
+    }
+  })
+}
+
+const totalPages = computed(() => {
+  return Math.ceil(students.value.length / itemsPerPage)
+})
+
+const paginatedStudents = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  const end = start + itemsPerPage
+  return students.value.slice(start, end)
+})
 </script>
 
 <template>
   <div class="page">
+    <div v-if="notification" class="notification-header">
+      {{ notification }}
+    </div>
     <div class="page-header">
       <h1>Students</h1>
       <button class="btn-primary" @click="openCreateForm"> Add Student</button>
@@ -166,31 +207,74 @@ const deleteStudent = async (id) => {
       <table v-if="students.length > 0">
         <thead>
           <tr>
-            <th>Student ID</th>
+            <th>ID</th>
             <th>Full Name</th>
             <th>Gender</th>
             <th>Class</th>
             <th>Guardian</th>
             <th>Phone</th>
+            <th>Status</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="student in students" :key="student.id">
-            <td>{{ student.student_id }}</td>
+          <tr v-for="(student, index) in paginatedStudents" :key="student.id">
+            <td>{{ (currentPage - 1) * itemsPerPage + index + 1 }}</td>
             <td>{{ student.full_name }}</td>
             <td class="capitalize">{{ student.gender }}</td>
             <td>{{ getClassName(student.class_id) }}</td>
             <td>{{ student.guardian_name }}</td>
             <td>{{ student.guardian_phone }}</td>
-            <td class="actions">
-              <button class="btn-edit" @click="openEditForm(student)">Edit</button>
-              <button class="btn-delete" @click="deleteStudent(student.id)">Delete</button>
+            <td>
+              <span :class="student.status === 'pending' ? 'badge-pending' : 'badge-approved' ">
+                {{ student.status }}
+              </span>
             </td>
+            <td class="actions">
+            <button
+             class="btn-result"
+             @click="viewResults(student.id)"
+             >
+             View Results
+            </button>
+
+            <button
+             class="btn-attendance"
+             @click="viewAttendance(student.id)"
+             >
+             View Attendance
+            </button>
+
+            <button
+            v-if="student.status === 'pending'"
+            class="btn-approve"
+            @click="approveStudent(student.id)"
+            >
+            Approve
+          </button>
+
+          <button
+          class="btn-edit"
+          @click="openEditForm(student)"
+          >
+          Edit
+          </button>
+
+          <button
+          class="btn-delete"
+          @click="deleteStudent(student.id)"
+          >
+          Delete
+          </button>
+          </td>
           </tr>
         </tbody>
       </table>
-      <p v-else class="empty-state">No students found. Click "Add Student" to create one.</p>
+      <Pagination
+        :currentPage="currentPage"
+        :totalPages="totalPages"
+        @change-page="currentPage = $event"
+      />
     </div>
 
     <div v-if="showForm" class="modal-overlay" @click.self="closeForm">
@@ -198,23 +282,7 @@ const deleteStudent = async (id) => {
         <h2>{{ isEditing ? 'Edit Student' : 'Add New Student' }}</h2>
 
         <form @submit.prevent="submitForm">
-
-          <div class="form-row" v-if="!isEditing">
-            <div class="form-group">
-              <label>Email (for login)</label>
-              <input v-model="form.email" type="email" required />
-            </div>
-            <div class="form-group">
-              <label>Password</label>
-              <input v-model="form.password" type="password" required />
-            </div>
-          </div>
-
           <div class="form-row">
-            <div class="form-group">
-              <label>Student ID</label>
-              <input v-model="form.student_id" type="text" required />
-            </div>
             <div class="form-group">
               <label>Class</label>
               <select v-model="form.class_id" required>
@@ -246,7 +314,7 @@ const deleteStudent = async (id) => {
                 <option value="female">Female</option>
               </select>
             </div>
-            
+
             <div class="form-group">
               <label>Guardian Phone</label>
               <input v-model="form.guardian_phone" type="text" required />
@@ -279,6 +347,17 @@ const deleteStudent = async (id) => {
 .page-header h1 {
   font-size: 1.6rem;
   color: var(--color-text);
+}
+
+.notification-header {
+  background-color: #4CAF50;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-weight: 500;
+  position: relative;
+  z-index: 2500;
 }
 
 .btn-primary {
@@ -432,6 +511,63 @@ td {
   cursor: pointer;
 }
 
+.badge-pending {
+  background-color: #FFA726;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.badge-approved {
+  background-color: #4CAF50;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-approve {
+  background-color: #2196F3;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: white;
+}
+
+.btn-result{
+  background:#10b981;
+  color:white;
+  border:none;
+  padding:0.4rem 0.8rem;
+  border-radius:var(--radius-sm);
+  cursor:pointer;
+  font-size:0.8rem;
+}
+
+.btn-attendance {
+  background: #6366f1;
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.btn-attendance:hover {
+  opacity: 0.9;
+}
+
+.btn-result:hover{
+  opacity:.9;
+}
 @media (max-width: 600px) {
   .form-row {
     flex-direction: column;

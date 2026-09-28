@@ -9,6 +9,7 @@ import Parents from '@/views/Parents.vue'
 import Classes from '@/views/Classes.vue'
 import Attendance from '@/views/Attendance.vue'
 import Results from '@/views/Results.vue'
+import payments from '@/views/Payments.vue'
 import Fees from '@/views/Fees.vue'
 import Subjects from '@/views/Subjects.vue'
 import Announcements from '@/views/Announcements.vue'
@@ -29,7 +30,8 @@ import StudentAnnouncements from '@/views/StudentAnnouncements.vue'
 import ParentAttendance from '@/views/ParentAttendance.vue'
 import ParentResults from '@/views/ParentResults.vue'
 import ParentAnnounments from '@/views/ParentAnnounments.vue'
-
+import StudentAttendance from '@/views/StudentAttendance.vue'
+import ClassTimetable from '@/views/ClassTimetable.vue'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -46,7 +48,11 @@ const router = createRouter({
         { path: 'results', component: Results },
         { path: 'fees', component: Fees },
         { path: 'subjects', component: Subjects },
-        { path: 'announcements', component: Announcements}
+        { path: 'payments', component: payments},
+        { path: 'announcements', component: Announcements },
+        { path: 'student-results/:studentId', name: 'StudentResults', component: StudentResults },
+        { path: 'students/:studentId/attendance', name: 'StudentAttendance', component: StudentAttendance },
+        {path: 'classes/:classId/timetable', name: 'ClassTimetable', component: ClassTimetable}
       ]
     },
     {

@@ -1,272 +1,597 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import api from '@/api/axios'
+import { ref, computed, watch, onMounted } from "vue";
+import api from "@/api/axios";
+import Pagination from '@/components/Pagination.vue'
 
-const results = ref([])
-const studentsList = ref([])
-const subjectsList = ref([])
-const classesList = ref([])
-const loading = ref(true)
-const errorMessage = ref('')
+// STATE
+const loading = ref(true);
+const saving = ref(false);
+const errorMessage = ref("");
 
-const showForm = ref(false)
-const isEditing = ref(false)
-const editingId = ref(null)
+const currentPage = ref(1)
+const itemsPerPage = 10
 
+const results = ref([]);
+const studentsList = ref([]);
+const subjectsList = ref([]);
+const classesList = ref([]);
+
+const showForm = ref(false);
+const isEditing = ref(false);
+const editingId = ref(null);
+
+// SEARCH & FILTERS
+const search = ref("");
+const filterTerm = ref("");
+const filterSession = ref("");
+
+// FORM
 const form = ref({
-  student_id: '',
-  subject_id: '',
-  class_id: '',
-  ca_score: '',
-  exam_score: '',
-  term: '',
-  session: ''
-})
+  student_id: "",
+  subject_id: "",
+  class_id: "",
+  ca_score: "",
+  exam_score: "",
+  term: "",
+  session: ""
+});
+
+// FETCH RESULTS
 
 const fetchResults = async () => {
   try {
-    loading.value = true
-    const res = await api.get('/results')
-    results.value = res.data.results
+    loading.value = true;
+    const { data } = await api.get("/results");
+    results.value = data;
   } catch (err) {
-    errorMessage.value = 'Failed to load results'
-    console.error(err)
+    console.error(err);
+    errorMessage.value = "Failed to load results.";
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
-const fetchStudentsList = async () => {
+// FETCH STUDENTS
+const fetchStudents = async () => {
   try {
-    const res = await api.get('/students')
-    studentsList.value = res.data.students
+    const { data } = await api.get("/students");
+    studentsList.value = data.students;
   } catch (err) {
-    console.error(err)
+    console.error(err);
   }
-}
+};
 
-const fetchSubjectsList = async () => {
+// FETCH SUBJECTS
+const fetchSubjects = async () => {
   try {
-    const res = await api.get('/subjects')
-    subjectsList.value = res.data.subjects
+    const { data } = await api.get("/subjects");
+    subjectsList.value = data.subjects;
   } catch (err) {
-    console.error(err)
+    console.error(err);
   }
-}
+};
 
-const fetchClassesList = async () => {
+// FETCH CLASSES
+const fetchClasses = async () => {
   try {
-    const res = await api.get('/classes')
-    classesList.value = res.data.classes
+    const { data } = await api.get("/classes");
+    classesList.value = data.classes;
   } catch (err) {
-    console.error(err)
+    console.error(err);
   }
-}
+};
 
+// PAGE LOAD
 onMounted(() => {
-  fetchResults()
-  fetchStudentsList()
-  fetchSubjectsList()
-  fetchClassesList()
-})
+  fetchResults();
+  fetchStudents();
+  fetchSubjects();
+  fetchClasses();
+});
 
-const getStudentName = (id) => {
-  const student = studentsList.value.find(s => s.id === id)
-  return student ? student.full_name : id
-}
+// FILTERED RESULTS
+const filteredResults = computed(() => {
+  return results.value.filter(result => {
+    const matchesSearch =
+      result.student_name
+        ?.toLowerCase()
+        .includes(search.value.toLowerCase()) ||
 
-const getSubjectName = (id) => {
-  const subject = subjectsList.value.find(s => s.id === id)
-  return subject ? subject.subject_name : id
-}
+      result.subject_name
+        ?.toLowerCase()
+        .includes(search.value.toLowerCase()) ||
 
-const getClassName = (id) => {
-  const cls = classesList.value.find(c => c.id === id)
-  return cls ? `${cls.class_name} ${cls.arm}` : id
-}
+      result.class_name
+        ?.toLowerCase()
+        .includes(search.value.toLowerCase());
 
+    const matchesTerm =
+      !filterTerm.value ||
+      result.term === filterTerm.value;
+
+    const matchesSession =
+      !filterSession.value ||
+      result.session === filterSession.value;
+
+    return matchesSearch && matchesTerm && matchesSession;
+  });
+});
+
+// OPEN CREATE
 const openCreateForm = () => {
-  isEditing.value = false
-  editingId.value = null
-  form.value = {
-    student_id: '',
-    subject_id: '',
-    class_id: '',
-    ca_score: '',
-    exam_score: '',
-    term: '',
-    session: ''
-  }
-  showForm.value = true
-}
 
-const openEditForm = (result) => {
-  isEditing.value = true
-  editingId.value = result.id
+  isEditing.value = false;
+
+  editingId.value = null;
+
   form.value = {
+    student_id: "",
+    subject_id: "",
+    class_id: "",
+    ca_score: "",
+    exam_score: "",
+    term: "",
+    session: ""
+  };
+
+  showForm.value = true;
+};
+
+// OPEN EDIT
+const openEditForm = (result) => {
+
+  isEditing.value = true;
+
+  editingId.value = result.id;
+
+  form.value = {
+
     student_id: result.student_id,
     subject_id: result.subject_id,
-    // class_id: result.class_id,
+    class_id: result.class_id,
     ca_score: result.ca_score,
     exam_score: result.exam_score,
     term: result.term,
     session: result.session
-  }
-  showForm.value = true
-}
+  };
 
+  showForm.value = true;
+};
+
+// CLOSE FORM
 const closeForm = () => {
-  showForm.value = false
-  errorMessage.value = ''
-}
 
+  showForm.value = false;
+
+  errorMessage.value = "";
+};
+
+// SAVE RESULT
 const submitForm = async () => {
+
+  errorMessage.value = "";
+
+  if (form.value.ca_score > 40) {
+    errorMessage.value = "CA score cannot exceed 40";
+    return;
+  }
+
+  if (form.value.exam_score > 60) {
+    errorMessage.value = "Exam score cannot exceed 60";
+    return;
+  }
+
+  if (form.value.ca_score < 0 || form.value.exam_score < 0) {
+    errorMessage.value = "Scores cannot be negative.";
+    return;
+  }
+
   try {
-    errorMessage.value = ''
+
+    saving.value = true;
+
     if (isEditing.value) {
-      const total = parseFloat(form.value.ca_score) + parseFloat(form.value.exam_score)
-      let grade
-      if (total >= 70) grade = 'A'
-      else if (total >= 60) grade = 'B'
-      else if (total >= 50) grade = 'C'
-      else if (total >= 45) grade = 'D'
-      else if (total >= 40) grade = 'E'
-      else grade = 'F'
 
-      await api.put(`/results/${editingId.value}`, { ...form.value, total, grade })
+      await api.put(
+        `/results/${editingId.value}`,
+        form.value
+      );
+
     } else {
-      await api.post('/results', form.value)
-    }
-    closeForm()
-    fetchResults()
-  } catch (err) {
-    errorMessage.value = err.response?.data?.message || 'Something went wrong'
-    console.error(err)
-  }
-}
 
-const deleteResult = async (id) => {
-  if (!confirm('Are you sure you want to delete this result?')) return
-  try {
-    await api.delete(`/results/${id}`)
-    fetchResults()
+      await api.post(
+        "/results",
+        form.value
+      );
+
+    }
+
+    closeForm();
+
+    fetchResults();
+
   } catch (err) {
-    errorMessage.value = 'Failed to delete result'
-    console.error(err)
+
+    console.error(err);
+
+    errorMessage.value =
+      err.response?.data?.message ||
+      "Something went wrong.";
+
+  } finally {
+
+    saving.value = false;
   }
-}
+};
+
+// DELETE
+const deleteResult = async (id) => {
+
+  if (!confirm("Delete this result?")) return;
+
+  try {
+
+    await api.delete(`/results/${id}`);
+
+    fetchResults();
+
+  } catch (err) {
+
+    console.error(err);
+
+    errorMessage.value = "Failed to delete result.";
+  }
+};
+
+// pagination
+const paginatedResults = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  const end = start + itemsPerPage
+
+  return filteredResults.value.slice(start, end)
+})
+
+const totalPages = computed(() => {
+  return Math.ceil(filteredResults.value.length / itemsPerPage)
+})
+
+watch([search, filterTerm], () => {
+  currentPage.value = 1
+})
 </script>
 
 <template>
   <div class="page">
+    <!-- Header -->
     <div class="page-header">
-      <h1>Results</h1>
-      <button class="btn-primary" @click="openCreateForm">Add Result</button>
+      <div>
+        <h1>Results</h1>
+        <p class="subtitle">
+          Manage students' academic results.
+        </p>
+      </div>
+      <button class="btn-primary" @click="openCreateForm">
+        Add Result
+      </button>
     </div>
 
-    <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
-    <p v-if="loading">Loading results...</p>
+    <!-- Error -->
+    <p v-if="errorMessage" class="error">
+      {{ errorMessage }}
+    </p>
+    <!-- Loading -->
+    <p v-if="loading" class="loading">
+      Loading results...
+    </p>
+    <template v-else>
+      <!-- Search & Filters -->
+      <div class="toolbar">
+        <input
+          v-model="search"
+          type="text"
+          class="search-input"
+          placeholder="Search by student, subject or class..."
+        />
+        <select v-model="filterTerm">
+          <option value="">All Terms</option>
+          <option value="first">First Term</option>
+          <option value="second">Second Term</option>
+          <option value="third">Third Term</option>
+        </select>
 
-    <div v-else class="table-card">
-      <table v-if="results.length > 0">
-        <thead>
-          <tr>
-            <th>Student</th>
-            <th>Subject</th>
-            <th>Class</th>
-            <th>CA</th>
-            <th>Exam</th>
-            <th>Total</th>
-            <th>Grade</th>
-            <th>Term</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="result in results" :key="result.id">
-            <td>{{ getStudentName(result.student_id) }}</td>
-            <td>{{ getSubjectName(result.subject_id) }}</td>
-            <td>{{ getClassName(result.class_id) }}</td>
-            <td>{{ result.ca_score }}</td>
-            <td>{{ result.exam_score }}</td>
-            <td>{{ result.total }}</td>
-            <td>{{ result.grade }}</td>
-            <td class="capitalize">{{ result.term }}</td>
-            <td class="actions">
-              <button class="btn-edit" @click="openEditForm(result)">Edit</button>
-              <button class="btn-delete" @click="deleteResult(result.id)">Delete</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <p v-else class="empty-state">No results found.</p>
-    </div>
+      </div>
 
-    <div v-if="showForm" class="modal-overlay" @click.self="closeForm">
+      <!-- Table -->
+      <div
+        v-if="filteredResults.length"
+        class="table-card"
+      >
+        <table>
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Subject</th>
+              <th>Class</th>
+              <th>CA</th>
+              <th>Exam</th>
+              <th>Total</th>
+              <th>Grade</th>
+              <th>Term</th>
+              <th>Session</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr
+              v-for="result in paginatedResults"
+              :key="result.id"
+            >
+              <td>{{ result.student_name }}</td>
+
+              <td>{{ result.subject_name }}</td>
+
+              <td>{{ result.class_name }}</td>
+
+              <td>{{ result.ca_score }}</td>
+
+              <td>{{ result.exam_score }}</td>
+
+              <td>{{ result.total }}</td>
+
+              <td>
+                <span
+                  class="grade-badge"
+                  :class="result.grade.toLowerCase()"
+                >
+                  {{ result.grade }}
+                </span>
+
+              </td>
+
+              <td class="capitalize">
+                {{ result.term }}
+              </td>
+
+              <td>
+                {{ result.session }}
+              </td>
+
+              <td class="actions">
+
+                <button
+                  class="btn-edit"
+                  @click="openEditForm(result)"
+                >
+                  Edit
+                </button>
+
+                <button
+                  class="btn-delete"
+                  @click="deleteResult(result.id)"
+                >
+                  Delete
+                </button>
+
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <Pagination
+           v-if="totalPages > 1"
+           :current-page="currentPage"
+           :total-pages="totalPages"
+          @change-page="currentPage = $event"
+          />
+      </div>
+
+      <!-- Empty -->
+      <div
+        v-else
+        class="empty-state"
+      >
+        <h3>No Results Found</h3>
+        <p>
+          No student result matches your current search or filters.
+        </p>
+      </div>
+    </template>
+    <!-- Modal -->
+
+    <div
+      v-if="showForm"
+      class="modal-overlay"
+      @click.self="closeForm"
+    >
       <div class="modal">
-        <h2>{{ isEditing ? 'Edit Result' : 'Add New Result' }}</h2>
+
+        <h2>
+          {{ isEditing ? "Edit Result" : "Add New Result" }}
+        </h2>
+
         <form @submit.prevent="submitForm">
+
           <div class="form-row">
+
             <div class="form-group">
+
               <label>Student</label>
-              <select v-model="form.student_id" required>
-                <option value="">Select Student</option>
-                <option v-for="student in studentsList" :key="student.id" :value="student.id">
-                  {{ student.full_name }} ({{ student.student_id }})
+
+              <select
+                v-model="form.student_id"
+                required
+              >
+
+                <option value="">
+                  Select Student
                 </option>
+
+                <option
+                  v-for="student in studentsList"
+                  :key="student.id"
+                  :value="student.id"
+                >
+                  {{ student.full_name }}
+                </option>
+
               </select>
+
             </div>
+
             <div class="form-group">
+
               <label>Subject</label>
-              <select v-model="form.subject_id" required>
-                <option value="">Select Subject</option>
-                <option v-for="subject in subjectsList" :key="subject.id" :value="subject.id">
+
+              <select
+                v-model="form.subject_id"
+                required
+              >
+
+                <option value="">
+                  Select Subject
+                </option>
+
+                <option
+                  v-for="subject in subjectsList"
+                  :key="subject.id"
+                  :value="subject.id"
+                >
                   {{ subject.subject_name }}
                 </option>
+
               </select>
+
             </div>
+
           </div>
+
           <div class="form-row">
+
             <div class="form-group">
+
               <label>Class</label>
-              <select v-model="form.class_id" required>
-                <option value="">Select Class</option>
-                <option v-for="cls in classesList" :key="cls.id" :value="cls.id">
+
+              <select
+                v-model="form.class_id"
+                required
+              >
+
+                <option value="">
+                  Select Class
+                </option>
+
+                <option
+                  v-for="cls in classesList"
+                  :key="cls.id"
+                  :value="cls.id"
+                >
                   {{ cls.class_name }} {{ cls.arm }}
                 </option>
+
               </select>
+
             </div>
+
             <div class="form-group">
+
               <label>Term</label>
-              <select v-model="form.term" required>
-                <option value="">Select</option>
-                <option value="first">First</option>
-                <option value="second">Second</option>
-                <option value="third">Third</option>
+
+              <select
+                v-model="form.term"
+                required
+              >
+
+                <option value="">Select Term</option>
+
+                <option value="first">
+                  First
+                </option>
+
+                <option value="second">
+                  Second
+                </option>
+
+                <option value="third">
+                  Third
+                </option>
+
               </select>
+
             </div>
+
           </div>
+
           <div class="form-row">
+
             <div class="form-group">
-              <label>CA Score (out of 40)</label>
-              <input v-model="form.ca_score" type="number" min="0" max="40" required />
+
+              <label>CA Score</label>
+
+              <input
+                v-model="form.ca_score"
+                type="number"
+                min="0"
+                max="40"
+                required
+              />
+
             </div>
+
             <div class="form-group">
-              <label>Exam Score (out of 60)</label>
-              <input v-model="form.exam_score" type="number" min="0" max="60" required />
+
+              <label>Exam Score</label>
+
+              <input
+                v-model="form.exam_score"
+                type="number"
+                min="0"
+                max="60"
+                required
+              />
+
             </div>
+
           </div>
+
           <div class="form-group">
+
             <label>Session</label>
-            <input v-model="form.session" type="text" placeholder="e.g. 2025/2026" required />
+
+            <input
+              v-model="form.session"
+              type="text"
+              placeholder="2025/2026"
+              required
+            />
+
           </div>
+
           <div class="modal-actions">
-            <button type="button" class="btn-secondary" @click="closeForm">Cancel</button>
-            <button type="submit" class="btn-primary">{{ isEditing ? 'Update' : 'Create' }}</button>
+
+            <button
+              type="button"
+              class="btn-secondary"
+              @click="closeForm"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              class="btn-primary"
+              :disabled="saving"
+            >
+              {{ saving ? "Saving..." : isEditing ? "Update" : "Create" }}
+            </button>
+
           </div>
+
         </form>
+
       </div>
+
     </div>
+
   </div>
 </template>
 
@@ -386,6 +711,21 @@ tbody tr {
 tbody tr:hover { 
   background-color: var(--color-background); 
 }
+thead tr {
+  background: #f8fafc;
+}
+
+tbody tr:nth-child(even) {
+  background: #fcfcfd;
+}
+
+tbody tr:hover {
+  background: #eef4ff;
+}
+
+td {
+  vertical-align: middle;
+}
 .capitalize { 
   text-transform: capitalize; 
 }
@@ -472,7 +812,57 @@ tbody tr:hover {
   outline: none; 
   border-color: var(--color-primary); 
 }
+/* Toolbar */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
 
+/* Search Input */
+.search-input {
+  flex: 1;
+  min-width: 280px;
+  padding: 0.75rem 1rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  background: #fff;
+  color: var(--color-text);
+  transition: all 0.2s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+/* Filters */
+.toolbar select {
+  min-width: 170px;
+  padding: 0.75rem 1rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--color-text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.toolbar select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.toolbar select:hover,
+.search-input:hover {
+  border-color: var(--color-primary);
+}
 @media (max-width: 600px) {
   .form-row { 
     flex-direction: column; 

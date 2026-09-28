@@ -80,17 +80,6 @@ const formatDate = (dateStr) => {
     <p v-if="loading">Loading dashboard data...</p>
 
     <template v-else>
-      <div class="quick-action">
-      <h2>Quick Actions</h2>
-      <div class="quick-actions">
-        <button @click="goTo('/dashboard/students')">Add Student</button>
-        <button @click="goTo('/dashboard/teachers')">Add Teacher</button>
-        <button @click="goTo('/dashboard/classes')">Add Class</button>
-        <button @click="goTo('/dashboard/results')">Enter Results</button>
-        <button @click="goTo('/dashboard/attendance')">Mark Attendance</button>
-      </div>
-      </div>
-
       <!-- Summary Cards -->
       <div class="cards-grid">
         <div class="card">
@@ -185,6 +174,18 @@ const formatDate = (dateStr) => {
           <p v-else class="empty-state">No announcements yet.</p>
         </div>
       </div>
+
+       <div class="quick-action">
+      <h2>Quick Actions</h2>
+      <div class="quick-actions">
+        <button @click="goTo('/dashboard/students')">Add Student</button>
+        <button @click="goTo('/dashboard/teachers')">Add Teacher</button>
+        <button @click="goTo('/dashboard/classes')">Add Class</button>
+        <button @click="goTo('/dashboard/results')">Enter Results</button>
+        <button @click="goTo('/dashboard/attendance')">Mark Attendance</button>
+      </div>
+      </div>
+
     </template>
   </div>
 </template>
@@ -244,6 +245,7 @@ const formatDate = (dateStr) => {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1.5rem;
   margin-bottom: 2.5rem;
+  margin-top: 2rem;
 }
 
 .card {
